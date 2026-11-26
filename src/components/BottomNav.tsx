@@ -25,7 +25,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, planTier, onSel
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))]"
     >
       <div className="pointer-events-auto w-full max-w-[330px]">
-        <GlassSurface borderRadius={32} blur={24} opacity={0.82} className="px-3 py-2">
+        <GlassSurface borderRadius={32} blur={12} opacity={0.86} className="px-3 py-2">
           <div className="grid grid-cols-3 items-center gap-2">
             {/* Left: Settings (Gear icon) */}
             <button

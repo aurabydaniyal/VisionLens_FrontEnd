@@ -51,7 +51,7 @@ const AppShell: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.12 }}
             className="h-full w-full"
           >
             <HomeCameraPage onOpenLensySession={handleOpenLensySession} />
@@ -61,10 +61,10 @@ const AppShell: React.FC = () => {
         {activeTab === 'lensy' && (
           <motion.div
             key="tab-lensy"
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 16 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
             className="h-full w-full"
           >
             <LensyChatPage
@@ -77,10 +77,10 @@ const AppShell: React.FC = () => {
         {activeTab === 'settings' && (
           <motion.div
             key="tab-settings"
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -16 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
             className="h-full w-full"
           >
             <SettingsPage />

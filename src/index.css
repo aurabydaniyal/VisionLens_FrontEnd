@@ -26,24 +26,25 @@
   line-height: 1.7;
 }
 
-/* GlassSurface liquid-glass surface styling (React Bits GlassSurface-inspired) */
+/* Optimized liquid-glass surface (12px GPU blur — silky 60fps on mobile) */
 .glass-surface {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: linear-gradient(
     135deg,
-    rgba(16, 26, 24, 0.72) 0%,
-    rgba(7, 11, 15, 0.84) 55%,
-    rgba(10, 24, 19, 0.76) 100%
+    rgba(14, 24, 22, 0.84) 0%,
+    rgba(7, 11, 15, 0.92) 55%,
+    rgba(10, 22, 18, 0.86) 100%
   );
-  backdrop-filter: blur(22px) saturate(185%);
-  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.65),
-    0 0 28px rgba(16, 185, 129, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(16, 185, 129, 0.15);
+    0 10px 28px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(16, 185, 129, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(16, 185, 129, 0.14);
+  transform: translateZ(0);
 }
 
 .glass-surface::before {
@@ -52,7 +53,7 @@
   inset: 0;
   background: radial-gradient(
     120% 70% at 50% 0%,
-    rgba(52, 211, 153, 0.16) 0%,
+    rgba(52, 211, 153, 0.14) 0%,
     transparent 65%
   );
   pointer-events: none;
@@ -61,47 +62,118 @@
 .glass-card {
   background: linear-gradient(
     160deg,
-    rgba(15, 23, 28, 0.78) 0%,
-    rgba(8, 12, 16, 0.88) 100%
+    rgba(14, 22, 27, 0.88) 0%,
+    rgba(7, 11, 15, 0.94) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  transform: translateZ(0);
 }
 
-/* Green pegtop animated loader (exact user design, emerald green palette) */
+/* Pure GPU transform/opacity word reveal (zero filter:blur jank) */
+@keyframes vl-word-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.vl-word-reveal {
+  display: inline-block;
+  opacity: 0;
+  animation: vl-word-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Pure GPU circular neon radar pulse for Lensy logo */
+@keyframes vl-signal-ring {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(1.95);
+    opacity: 0;
+  }
+}
+
+.vl-signal-ring {
+  animation: vl-signal-ring 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* Lightweight ambient drift (GPU transform only) */
+@keyframes vl-ambient-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(14px, -16px, 0) scale(1.06);
+  }
+}
+
+.vl-ambient-orb {
+  animation: vl-ambient-float 12s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* CodeSlots error shake */
+@keyframes vl-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+.vl-shake {
+  animation: vl-shake 0.32s ease-in-out;
+}
+
+/* Green pegtop animated loader (emerald neon, GPU-composited) */
 .vl-green-loader {
   --fill-color: #10b981;
-  --shine-color: #10b98166;
   width: 100px;
   height: 100px;
   position: relative;
-  filter: drop-shadow(0 0 12px var(--shine-color));
 }
 
 .vl-green-loader .pegtop-one {
   position: absolute;
   inset: 0;
   animation: vl-flowe-one 1s linear infinite;
+  will-change: transform, opacity;
 }
 
 .vl-green-loader .pegtop-two {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: scale(0) translateY(-200px) translateX(-100px);
   animation: vl-flowe-two 1s linear infinite;
   animation-delay: 0.3s;
+  will-change: transform, opacity;
 }
 
 .vl-green-loader .pegtop-three {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: scale(0) translateY(-200px) translateX(100px);
   animation: vl-flowe-three 1s linear infinite;
   animation-delay: 0.6s;
+  will-change: transform, opacity;
 }
 
 .vl-green-loader svg g path:first-child {
@@ -110,69 +182,69 @@
 
 @keyframes vl-flowe-one {
   0% {
-    transform: scale(0.5) translateY(-100px);
+    transform: translate3d(0, -100px, 0) scale(0.5);
     opacity: 0;
   }
   25% {
-    transform: scale(0.75) translateY(-50px);
+    transform: translate3d(0, -50px, 0) scale(0.75);
     opacity: 1;
   }
   50% {
-    transform: scale(1) translateY(0px);
+    transform: translate3d(0, 0, 0) scale(1);
     opacity: 1;
   }
   75% {
-    transform: scale(0.5) translateY(28px);
+    transform: translate3d(0, 28px, 0) scale(0.5);
     opacity: 1;
   }
   100% {
-    transform: scale(0) translateY(56px);
+    transform: translate3d(0, 56px, 0) scale(0);
     opacity: 0;
   }
 }
 
 @keyframes vl-flowe-two {
   0% {
-    transform: scale(0.5) rotateZ(-10deg) translateY(-100px) translateX(-50px);
+    transform: translate3d(-50px, -100px, 0) rotate(-10deg) scale(0.5);
     opacity: 0;
   }
   25% {
-    transform: scale(1) rotateZ(-5deg) translateY(-50px) translateX(-25px);
+    transform: translate3d(-25px, -50px, 0) rotate(-5deg) scale(1);
     opacity: 1;
   }
   50% {
-    transform: scale(1) rotateZ(0deg) translateY(0px) translateX(-12px);
+    transform: translate3d(-12px, 0, 0) rotate(0deg) scale(1);
     opacity: 1;
   }
   75% {
-    transform: scale(0.5) rotateZ(5deg) translateY(28px) translateX(0px);
+    transform: translate3d(0, 28px, 0) rotate(5deg) scale(0.5);
     opacity: 1;
   }
   100% {
-    transform: scale(0) rotateZ(10deg) translateY(56px) translateX(12px);
+    transform: translate3d(12px, 56px, 0) rotate(10deg) scale(0);
     opacity: 0;
   }
 }
 
 @keyframes vl-flowe-three {
   0% {
-    transform: scale(0.5) rotateZ(10deg) translateY(-100px) translateX(50px);
+    transform: translate3d(50px, -100px, 0) rotate(10deg) scale(0.5);
     opacity: 0;
   }
   25% {
-    transform: scale(1) rotateZ(5deg) translateY(-50px) translateX(25px);
+    transform: translate3d(25px, -50px, 0) rotate(5deg) scale(1);
     opacity: 1;
   }
   50% {
-    transform: scale(1) rotateZ(0deg) translateY(0px) translateX(12px);
+    transform: translate3d(12px, 0, 0) rotate(0deg) scale(1);
     opacity: 1;
   }
   75% {
-    transform: scale(0.5) rotateZ(-5deg) translateY(28px) translateX(0px);
+    transform: translate3d(0, 28px, 0) rotate(-5deg) scale(0.5);
     opacity: 1;
   }
   100% {
-    transform: scale(0) rotateZ(-10deg) translateY(56px) translateX(-12px);
+    transform: translate3d(-12px, 56px, 0) rotate(-10deg) scale(0);
     opacity: 0;
   }
 }

@@ -12,12 +12,12 @@ interface GlassSurfaceProps {
  * Liquid-glass surface inspired by @react-bits/GlassSurface-JS-CSS.
  * Combines SVG subtle specular refraction, backdrop blur, and emerald edge highlights.
  */
-export const GlassSurface: React.FC<GlassSurfaceProps> = ({
+export const GlassSurface: React.FC<GlassSurfaceProps> = React.memo(({
   children,
   className = '',
   borderRadius = 28,
-  blur = 22,
-  opacity = 0.78,
+  blur = 12,
+  opacity = 0.84,
 }) => {
   const filterId = useId().replace(/:/g, '');
 
@@ -60,6 +60,8 @@ export const GlassSurface: React.FC<GlassSurfaceProps> = ({
       <div className="relative z-10 h-full w-full">{children}</div>
     </div>
   );
-};
+});
+
+GlassSurface.displayName = 'GlassSurface';
 
 export default GlassSurface;

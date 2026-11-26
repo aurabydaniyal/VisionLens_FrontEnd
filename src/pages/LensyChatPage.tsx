@@ -413,19 +413,15 @@ export const LensyChatPage: React.FC<LensyChatPageProps> = ({
             /* Gemini-Style Centered Lensy Welcome Hero */
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="relative flex h-24 w-24 items-center justify-center">
-                {[0, 0.9].map((delay) => (
-                  <motion.span
-                    key={delay}
-                    initial={{ scale: 0.9, opacity: 0.6 }}
-                    animate={{ scale: 1.85, opacity: 0 }}
-                    transition={{ duration: 2.5, repeat: Infinity, delay, ease: 'easeOut' }}
-                    className="pointer-events-none absolute inset-0 rounded-full border border-emerald-400/55"
-                  />
-                ))}
+                <span className="vl-signal-ring pointer-events-none absolute inset-0 rounded-full border border-emerald-400/55" />
+                <span
+                  className="vl-signal-ring pointer-events-none absolute inset-0 rounded-full border border-emerald-400/35"
+                  style={{ animationDelay: '1.2s' }}
+                />
                 <img
                   src="/lensy-logo.png"
                   alt="Lensy AI"
-                  className="relative z-10 h-20 w-20 rounded-full border-2 border-emerald-400/70 object-cover shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+                  className="relative z-10 h-20 w-20 rounded-full border-2 border-emerald-400/70 object-cover shadow-[0_0_24px_rgba(16,185,129,0.45)]"
                 />
               </div>
 
