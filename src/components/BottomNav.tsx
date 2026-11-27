@@ -13,8 +13,8 @@ interface BottomNavProps {
 }
 
 /**
- * Mobile-first floating GlassSurface bottom navigation bar with exact 3 icons:
- * Left: Gear (Settings) | Middle: Home (Main Default Camera) | Right: Lensy Bot logo
+ * Compact, sleek rounded floating navigation pill inside a dedicated edge-blur dock.
+ * Sits in its own flex-shrink-0 slot below every screen so it NEVER hides content or prompt bars.
  */
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, planTier, onSelect }) => {
   const isLite = planTier === 'lite';
@@ -22,34 +22,37 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, planTier, onSel
   return (
     <nav
       aria-label="Primary Navigation"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))]"
+      className="vl-bottom-dock relative z-40 shrink-0 border-t border-white/[0.06] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5"
     >
-      <div className="pointer-events-auto w-full max-w-[330px]">
-        <GlassSurface borderRadius={32} blur={12} opacity={0.86} className="px-3 py-2">
-          <div className="grid grid-cols-3 items-center gap-2">
-            {/* Left: Settings (Gear icon) */}
+      {/* Subtle emerald hairline glow */}
+      <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/35 to-transparent" />
+
+      <div className="mx-auto w-full max-w-[264px]">
+        <GlassSurface borderRadius={999} blur={10} opacity={0.88} className="px-2 py-1">
+          <div className="grid grid-cols-3 items-center gap-1">
+            {/* Left: Settings */}
             <button
               type="button"
               onClick={() => onSelect('settings')}
               aria-label="Settings"
-              className="group relative flex flex-col items-center justify-center rounded-2xl py-2 transition-colors focus:outline-none"
+              className="group relative flex flex-col items-center justify-center rounded-full py-1.5 transition-colors focus:outline-none"
             >
               {activeTab === 'settings' && (
                 <motion.span
                   layoutId="vl-nav-pill"
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute inset-0 rounded-2xl border border-emerald-400/35 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.28)]"
+                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                  className="absolute inset-0 rounded-full border border-emerald-400/35 bg-emerald-500/18 shadow-[0_0_16px_rgba(16,185,129,0.28)]"
                 />
               )}
               <Settings
-                className={`relative z-10 h-6 w-6 transition-all duration-200 ${
+                className={`relative z-10 h-[18px] w-[18px] transition-all duration-200 ${
                   activeTab === 'settings'
-                    ? 'rotate-45 text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.75)]'
+                    ? 'rotate-45 text-emerald-300'
                     : 'text-zinc-400 group-hover:text-zinc-200'
                 }`}
               />
               <span
-                className={`relative z-10 mt-0.5 text-[10px] font-medium tracking-wide ${
+                className={`relative z-10 mt-0.5 text-[9px] font-semibold tracking-wide ${
                   activeTab === 'settings' ? 'text-emerald-300' : 'text-zinc-500'
                 }`}
               >
@@ -57,29 +60,29 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, planTier, onSel
               </span>
             </button>
 
-            {/* Middle: Home (Main Default Page) */}
+            {/* Middle: Home */}
             <button
               type="button"
               onClick={() => onSelect('home')}
               aria-label="Home Camera"
-              className="group relative flex flex-col items-center justify-center rounded-2xl py-2 transition-colors focus:outline-none"
+              className="group relative flex flex-col items-center justify-center rounded-full py-1.5 transition-colors focus:outline-none"
             >
               {activeTab === 'home' && (
                 <motion.span
                   layoutId="vl-nav-pill"
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute inset-0 rounded-2xl border border-emerald-400/35 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.28)]"
+                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                  className="absolute inset-0 rounded-full border border-emerald-400/35 bg-emerald-500/18 shadow-[0_0_16px_rgba(16,185,129,0.28)]"
                 />
               )}
               <Home
-                className={`relative z-10 h-6 w-6 transition-all duration-200 ${
+                className={`relative z-10 h-[18px] w-[18px] transition-all duration-200 ${
                   activeTab === 'home'
-                    ? 'scale-105 text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.75)]'
+                    ? 'scale-105 text-emerald-300'
                     : 'text-zinc-400 group-hover:text-zinc-200'
                 }`}
               />
               <span
-                className={`relative z-10 mt-0.5 text-[10px] font-medium tracking-wide ${
+                className={`relative z-10 mt-0.5 text-[9px] font-semibold tracking-wide ${
                   activeTab === 'home' ? 'text-emerald-300' : 'text-zinc-500'
                 }`}
               >
@@ -87,38 +90,38 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, planTier, onSel
               </span>
             </button>
 
-            {/* Right: Lensy AI (Extracted circular Lensy Bot image) */}
+            {/* Right: Lensy AI */}
             <button
               type="button"
               onClick={() => onSelect('lensy')}
               aria-label="Lensy AI"
-              className="group relative flex flex-col items-center justify-center rounded-2xl py-1.5 transition-colors focus:outline-none"
+              className="group relative flex flex-col items-center justify-center rounded-full py-1 transition-colors focus:outline-none"
             >
               {activeTab === 'lensy' && (
                 <motion.span
                   layoutId="vl-nav-pill"
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute inset-0 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                  className="absolute inset-0 rounded-full border border-emerald-400/40 bg-emerald-500/18 shadow-[0_0_16px_rgba(16,185,129,0.3)]"
                 />
               )}
               <div className="relative z-10 flex items-center justify-center">
                 <img
                   src="/lensy-logo.png"
                   alt="Lensy AI"
-                  className={`h-7 w-7 rounded-full object-cover transition-all duration-200 ${
+                  className={`h-[22px] w-[22px] rounded-full object-cover transition-all duration-200 ${
                     activeTab === 'lensy'
-                      ? 'scale-110 ring-2 ring-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.8)]'
+                      ? 'scale-105 ring-2 ring-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.75)]'
                       : 'opacity-85 ring-1 ring-white/20 group-hover:opacity-100'
                   }`}
                 />
                 {isLite && (
-                  <span className="absolute -right-1.5 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-emerald-400/50 bg-zinc-950 text-emerald-300">
-                    <Lock className="h-2 w-2" />
+                  <span className="absolute -right-1.5 -top-1 flex h-3 w-3 items-center justify-center rounded-full border border-emerald-400/50 bg-zinc-950 text-emerald-300">
+                    <Lock className="h-1.5 w-1.5" />
                   </span>
                 )}
               </div>
               <span
-                className={`relative z-10 mt-0.5 text-[10px] font-medium tracking-wide ${
+                className={`relative z-10 mt-0.5 text-[9px] font-semibold tracking-wide ${
                   activeTab === 'lensy' ? 'text-emerald-300' : 'text-zinc-500'
                 }`}
               >

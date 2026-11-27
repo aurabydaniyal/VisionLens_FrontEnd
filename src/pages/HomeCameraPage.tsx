@@ -40,6 +40,7 @@ type CameraState =
 
 interface HomeCameraPageProps {
   onOpenLensySession: (sessionId: string) => void;
+  onAskLensyWithImage: (blob: Blob, prompt: string) => void;
 }
 
 const LANG_LABELS: Record<string, string> = {
@@ -50,7 +51,10 @@ const LANG_LABELS: Record<string, string> = {
   zh: '中文',
 };
 
-export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySession }) => {
+export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({
+  onOpenLensySession,
+  onAskLensyWithImage,
+}) => {
   const { user, setUserProfile, updateQuota, openUpgradeModal } = useAuth();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -68,7 +72,9 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
   const [frameResult, setFrameResult] = useState<FrameProcessResponse | null>(null);
   const [tapResult, setTapResult] = useState<TapIdentifyResponse | null>(null);
   const [tapRipple, setTapRipple] = useState<{ x: number; y: number } | null>(null);
-  const [actionLoading, setActionLoading] = useState<'translate_full' | 'summarize' | 'more_info' | null>(null);
+  const [actionLoading, setActionLoading] = useState<
+    'translate_full' | 'summarize' | 'more_info' | null
+  >(null);
   const [actionOutput, setActionOutput] = useState<{
     title: string;
     text: string;
@@ -129,7 +135,6 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     };
   }, [startCamera, stopCamera]);
 
-  // Pause camera sampling automatically on visibilitychange
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) {
@@ -154,11 +159,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
         setFrameResult(res);
         updateQuota(res.quota);
 
-        if (
-          res.items.length > 0 &&
-          user.voice_mode === 'auto' &&
-          user.speaker_enabled
-        ) {
+        if (res.items.length > 0 && user.voice_mode === 'auto' && user.speaker_enabled) {
           void speakText(res.full_translated_text, res.output_language, true);
         }
       } catch (err) {
@@ -173,7 +174,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     [saveToHistory, updateQuota, user]
   );
 
-  // Smart Auto-Scan interval gated by Laplacian sharpness + dHash scene change
+  // Smart Auto-Scan interval gated by client-side sharpness & scene-change detection
   useEffect(() => {
     if (!autoScan || cameraState !== 'streaming') return;
     const id = window.setInterval(async () => {
@@ -184,7 +185,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
         lastDHashRef.current = gate.dhash;
         await runFrameScan(gate.blob, 1);
       } catch {
-        // Ignore transient frame-capture issues
+        // Ignore transient capture issues
       }
     }, 2600);
     return () => window.clearInterval(id);
@@ -207,7 +208,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
         await runFrameScan(gate.blob, 1);
       }
     } catch {
-      setStatusBanner('Could not capture current frame. Try uploading an image.');
+      setStatusBanner('Could not capture frame. Try uploading an image.');
     }
   };
 
@@ -241,7 +242,6 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     });
     setCameraState('frozen');
 
-    // Resize cleanly in RAM via HTMLImageElement before sending
     const img = new Image();
     img.onload = async () => {
       try {
@@ -263,7 +263,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     const tapY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
 
     setTapRipple({ x: tapX * 100, y: tapY * 100 });
-    window.setTimeout(() => setTapRipple(null), 900);
+    window.setTimeout(() => setTapRipple(null), 850);
 
     let frameBlob: Blob | null = lastFrameBlobRef.current;
     if (!uploadedPreviewUrl && videoRef.current && (cameraState === 'streaming' || cameraState === 'frozen')) {
@@ -295,6 +295,39 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     }
   };
 
+  /**
+   * When an object isn't recognized and the user taps "Yes, Ask Lensy",
+   * automatically grab the current/tapped frame and hand it straight to Lensy Vision!
+   */
+  const handleAskLensyCapturedFrame = async () => {
+    if (!user) return;
+    if (user.plan_tier === 'lite') {
+      openUpgradeModal('Ask Lensy visual identification is available on VisionLens Plus.', false);
+      return;
+    }
+
+    let blobToSend = lastFrameBlobRef.current;
+    if (!blobToSend && videoRef.current && (cameraState === 'streaming' || cameraState === 'frozen')) {
+      try {
+        blobToSend = await captureResizedBlob(videoRef.current);
+        lastFrameBlobRef.current = blobToSend;
+      } catch {
+        blobToSend = null;
+      }
+    }
+
+    if (!blobToSend) {
+      setStatusBanner('No image frame available yet. Capture or upload a photo first.');
+      return;
+    }
+
+    setTapResult(null);
+    onAskLensyWithImage(
+      blobToSend,
+      'Please identify and explain the main object in this captured photo.'
+    );
+  };
+
   const handlePageChange = async (nextPage: number) => {
     if (!lastFrameBlobRef.current) return;
     await runFrameScan(lastFrameBlobRef.current, nextPage);
@@ -306,7 +339,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
     try {
       const res = await api.textAction(action, frameResult.full_source_text);
       setActionOutput({
-        title: action === 'summarize' ? 'AI Summary' : 'Full Translation',
+        title: action === 'summarize' ? 'Summary' : 'Full Translation',
         text: res.result_text,
         direction: res.direction,
       });
@@ -328,7 +361,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
   ) => {
     if (!user) return;
     if (user.plan_tier === 'lite') {
-      openUpgradeModal('More Info handoff to Lensy AI is available on VisionLens Plus.', false);
+      openUpgradeModal('More Info with Lensy AI is available on VisionLens Plus.', false);
       return;
     }
     setActionLoading('more_info');
@@ -367,7 +400,6 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#04070a]">
-      {/* Hidden Capture / Upload Image Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -377,14 +409,20 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
         className="hidden"
       />
 
-      {/* Top Glass Headline Bar with Lensy Logo + Vision Lens Name */}
-      <header className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex items-center justify-between bg-gradient-to-b from-black/85 via-black/45 to-transparent px-4 pb-6 pt-[max(0.85rem,env(safe-area-inset-top))]">
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-full border border-emerald-400/50 bg-zinc-950 p-0.5 shadow-[0_0_16px_rgba(16,185,129,0.45)]">
-            <img src="/lensy-logo.png" alt="Vision Lens" className="h-full w-full rounded-full object-cover" />
+      {/* Compact Top Overlay Header */}
+      <header className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex items-center justify-between bg-gradient-to-b from-black/85 via-black/45 to-transparent px-3.5 pb-5 pt-[max(0.65rem,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-400/50 bg-zinc-950 p-0.5 shadow-[0_0_14px_rgba(16,185,129,0.4)]">
+            <img
+              src="/lensy-logo.png"
+              alt="Vision Lens"
+              className="h-full w-full rounded-full object-cover"
+            />
           </div>
           <div>
-            <h1 className="text-sm font-extrabold tracking-tight text-white">Vision Lens</h1>
+            <h1 className="text-[13px] font-extrabold leading-tight tracking-tight text-white">
+              Vision Lens
+            </h1>
             <div className="flex items-center gap-1.5 text-[10px]">
               <span
                 className={`font-semibold uppercase tracking-wider ${
@@ -394,7 +432,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
                 {user?.plan_tier === 'plus' ? 'Plus' : 'Lite'}
               </span>
               {user?.plan_tier === 'lite' && (
-                <span className="rounded bg-white/10 px-1.5 py-0.2 font-mono text-emerald-300">
+                <span className="rounded bg-white/10 px-1.5 font-mono text-[10px] text-emerald-300">
                   {String(quotaMins).padStart(2, '0')}:{String(quotaSecs).padStart(2, '0')}
                 </span>
               )}
@@ -402,8 +440,8 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border border-emerald-400/35 bg-zinc-950/75 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 backdrop-blur-md">
+        <div className="flex items-center gap-1.5">
+          <span className="rounded-full border border-emerald-400/35 bg-zinc-950/75 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300 backdrop-blur-md">
             {LANG_LABELS[user?.output_language || 'en']}
           </span>
           <button
@@ -413,20 +451,19 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-zinc-950/75 text-zinc-200 backdrop-blur-md transition hover:border-emerald-400/50"
           >
             {user?.speaker_enabled ? (
-              <Volume2 className="h-4 w-4 text-emerald-400" />
+              <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
             ) : (
-              <VolumeX className="h-4 w-4 text-zinc-500" />
+              <VolumeX className="h-3.5 w-3.5 text-zinc-500" />
             )}
           </button>
         </div>
       </header>
 
-      {/* Main Live Camera / Image Viewport (Tap anywhere for Tap-to-Identify!) */}
+      {/* Main Live Camera / Uploaded Photo Viewport (Tap anywhere to identify object) */}
       <div
         onClick={handleViewportTap}
-        className="relative flex flex-1 cursor-crosshair items-center justify-center overflow-hidden bg-zinc-950"
+        className="relative flex min-h-0 flex-1 cursor-crosshair items-center justify-center overflow-hidden bg-zinc-950"
       >
-        {/* Live Video Stream */}
         <video
           ref={videoRef}
           playsInline
@@ -435,40 +472,39 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
           className={`h-full w-full object-cover ${uploadedPreviewUrl ? 'hidden' : 'block'}`}
         />
 
-        {/* Uploaded / Captured Static Image Preview */}
         {uploadedPreviewUrl && (
           <img
             src={uploadedPreviewUrl}
             alt="Captured scene"
-            className="h-full w-full object-contain bg-black"
+            className="h-full w-full bg-black object-contain"
           />
         )}
 
-        {/* Subtle Corner Viewfinder Reticle Guides */}
+        {/* Subtle Corner Reticle Guides */}
         {(cameraState === 'streaming' || cameraState === 'frozen') && (
-          <div className="pointer-events-none absolute inset-6 sm:inset-10">
-            <span className="absolute left-0 top-10 h-6 w-6 rounded-tl-xl border-l-2 border-t-2 border-emerald-400/55" />
-            <span className="absolute right-0 top-10 h-6 w-6 rounded-tr-xl border-r-2 border-t-2 border-emerald-400/55" />
-            <span className="absolute bottom-28 left-0 h-6 w-6 rounded-bl-xl border-b-2 border-l-2 border-emerald-400/55" />
-            <span className="absolute bottom-28 right-0 h-6 w-6 rounded-br-xl border-b-2 border-r-2 border-emerald-400/55" />
+          <div className="pointer-events-none absolute inset-5 sm:inset-8">
+            <span className="absolute left-0 top-10 h-5 w-5 rounded-tl-xl border-l-2 border-t-2 border-emerald-400/50" />
+            <span className="absolute right-0 top-10 h-5 w-5 rounded-tr-xl border-r-2 border-t-2 border-emerald-400/50" />
+            <span className="absolute bottom-10 left-0 h-5 w-5 rounded-bl-xl border-b-2 border-l-2 border-emerald-400/50" />
+            <span className="absolute bottom-10 right-0 h-5 w-5 rounded-br-xl border-b-2 border-r-2 border-emerald-400/50" />
           </div>
         )}
 
-        {/* Tap-to-Identify Target Ripple Animation */}
+        {/* Tap Target Ripple */}
         <AnimatePresence>
           {tapRipple && (
             <motion.div
               initial={{ scale: 0.4, opacity: 1 }}
-              animate={{ scale: 2.4, opacity: 0 }}
+              animate={{ scale: 2.3, opacity: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.75, ease: 'easeOut' }}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
               style={{ left: `${tapRipple.x}%`, top: `${tapRipple.y}%` }}
-              className="pointer-events-none absolute z-20 -ml-7 -mt-7 h-14 w-14 rounded-full border-2 border-emerald-400 shadow-[0_0_20px_#34d399]"
+              className="pointer-events-none absolute z-20 -ml-6 -mt-6 h-12 w-12 rounded-full border-2 border-emerald-400 shadow-[0_0_18px_#34d399]"
             />
           )}
         </AnimatePresence>
 
-        {/* Tap-to-Identify Detected Bounding Box */}
+        {/* Detected Object Bounding Box */}
         {tapResult?.status === 'identified' && tapResult.bbox && (
           <motion.div
             initial={{ opacity: 0, scale: 0.94 }}
@@ -479,70 +515,70 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
               width: `${tapResult.bbox[2] * 100}%`,
               height: `${tapResult.bbox[3] * 100}%`,
             }}
-            className="pointer-events-none absolute z-20 rounded-2xl border-2 border-emerald-400 bg-emerald-500/10 shadow-[0_0_24px_rgba(16,185,129,0.45)]"
+            className="pointer-events-none absolute z-20 rounded-2xl border-2 border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.45)]"
           />
         )}
 
         {/* Camera Initializing State */}
         {cameraState === 'initializing' && !uploadedPreviewUrl && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#04070a]/90">
-            <GreenLoader scale={0.55} label="Initializing optical viewfinder..." />
+            <GreenLoader scale={0.5} label="Starting camera..." />
           </div>
         )}
 
-        {/* Permission Denied / Camera Unavailable Recovery Card with Upload Fallback */}
+        {/* Camera Recovery / Upload Card */}
         {(cameraState === 'permission_denied' || cameraState === 'camera_unavailable') &&
           !uploadedPreviewUrl && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="glass-card relative z-20 mx-4 max-w-sm rounded-3xl border border-emerald-500/30 p-6 text-center"
+              className="glass-card relative z-20 mx-4 max-w-xs rounded-3xl border border-emerald-500/30 p-5 text-center"
             >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-300">
-                <CameraOff className="h-7 w-7" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-300">
+                <CameraOff className="h-6 w-6" />
               </div>
-              <h2 className="mt-4 text-base font-bold text-white">
+              <h2 className="mt-3 text-sm font-bold text-white">
                 {cameraState === 'permission_denied'
                   ? 'Camera Permission Needed'
                   : 'No Live Camera Detected'}
               </h2>
-              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
                 {cameraState === 'permission_denied'
-                  ? 'Allow camera access in your browser settings for live scanning, or capture/upload any photo below.'
-                  : 'Use your device gallery or camera capture to run instant OCR, Translation, Tap-to-Identify, and Lensy AI.'}
+                  ? 'Allow camera access for live scanning, or upload any photo below.'
+                  : 'Choose a photo from your device for instant translation, object identification, and Lensy AI.'}
               </p>
 
-              <div className="mt-5 flex flex-col gap-2.5">
+              <div className="mt-4 flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 px-4 py-3 text-sm font-bold text-zinc-950 shadow-[0_0_24px_rgba(16,185,129,0.4)] transition hover:brightness-110"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 px-4 py-2.5 text-xs font-bold text-zinc-950 shadow-[0_0_20px_rgba(16,185,129,0.35)] transition hover:brightness-110"
                 >
                   <ImagePlus className="h-4 w-4" />
-                  Capture / Upload Image
+                  Capture / Upload Photo
                 </button>
                 <button
                   type="button"
                   onClick={() => void startCamera()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-white/10"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Retry Live Camera
+                  Retry Camera
                 </button>
               </div>
             </div>
           )}
 
-        {/* Active Scanning GreenLoader Pill */}
+        {/* Active Scanning Indicator (Clean — Zero Technical Details) */}
         <AnimatePresence>
           {scanning && (
             <motion.div
-              initial={{ opacity: 0, y: -12 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="pointer-events-none absolute top-20 z-30 flex items-center gap-2.5 rounded-full border border-emerald-400/40 bg-zinc-950/90 px-4 py-1.5 shadow-[0_0_24px_rgba(16,185,129,0.35)] backdrop-blur-md"
+              exit={{ opacity: 0, y: -10 }}
+              className="pointer-events-none absolute top-16 z-30 flex items-center gap-2 rounded-full border border-emerald-400/40 bg-zinc-950/90 px-3.5 py-1 shadow-[0_0_20px_rgba(16,185,129,0.35)] backdrop-blur-md"
             >
-              <GreenLoader scale={0.22} />
-              <span className="text-xs font-semibold text-emerald-200">Analyzing in RAM...</span>
+              <GreenLoader scale={0.2} />
+              <span className="text-xs font-semibold text-emerald-200">Scanning...</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -551,11 +587,11 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
         <AnimatePresence>
           {statusBanner && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="absolute top-20 z-30 mx-4 flex max-w-md items-center gap-2 rounded-2xl border border-rose-500/35 bg-zinc-950/90 px-3.5 py-2 text-xs text-rose-200 backdrop-blur-md"
+              className="absolute top-16 z-30 mx-4 flex max-w-sm items-center gap-2 rounded-2xl border border-rose-500/35 bg-zinc-950/92 px-3.5 py-2 text-xs text-rose-200 backdrop-blur-md"
             >
               <span className="flex-1">{statusBanner}</span>
               <button type="button" onClick={() => setStatusBanner('')}>
@@ -565,22 +601,21 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
           )}
         </AnimatePresence>
 
-        {/* Tap-to-Identify Result Card */}
+        {/* Tap-to-Identify Result Card (ZERO Model Names + Ask Lensy Option when Unrecognized) */}
         <AnimatePresence>
           {tapResult && (
             <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.96 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-card absolute inset-x-3 top-24 z-30 mx-auto max-w-md rounded-3xl border border-emerald-400/40 p-4 shadow-2xl"
+              className="glass-card absolute inset-x-3 top-[4.5rem] z-30 mx-auto max-w-sm rounded-3xl border border-emerald-400/40 p-3.5 shadow-2xl"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
                   <Crosshair className="h-4 w-4 text-emerald-400" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
-                    Tap-to-Identify •{' '}
-                    {tapResult.source_engine === 'gemini_vision' ? 'AI Vision' : 'YOLOv8n'}
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                    {tapResult.status === 'identified' ? 'Object Identified' : 'Not Recognized'}
                   </span>
                 </div>
                 <button
@@ -593,20 +628,20 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
               </div>
 
               {tapResult.status === 'identified' && tapResult.label ? (
-                <div className="mt-2.5">
+                <div className="mt-2">
                   <div className="flex items-center justify-between gap-2">
                     <TextGenerateEffect
                       words={tapResult.label}
                       dir={tapResult.direction}
                       lang={user?.output_language}
-                      className="text-lg font-bold text-white"
+                      className="text-base font-bold text-white"
                     />
                     <button
                       type="button"
                       onClick={() =>
                         user && void speakText(tapResult.label || '', user.output_language, true)
                       }
-                      className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 p-2 text-emerald-300 hover:bg-emerald-500/25"
+                      className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 p-1.5 text-emerald-300 hover:bg-emerald-500/25"
                     >
                       <Volume2 className="h-4 w-4" />
                     </button>
@@ -615,7 +650,7 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
                   {tapResult.categories.length > 0 && (
                     <div
                       dir={tapResult.direction}
-                      className="mt-2 flex flex-wrap items-center gap-1.5"
+                      className="mt-1.5 flex flex-wrap items-center gap-1.5"
                     >
                       {tapResult.categories.map((cat) => (
                         <span
@@ -625,11 +660,6 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
                           {cat}
                         </span>
                       ))}
-                      {tapResult.confidence && (
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                          {Math.round(tapResult.confidence * 100)}%
-                        </span>
-                      )}
                     </div>
                   )}
 
@@ -644,41 +674,51 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
                         user?.output_language || 'en'
                       )
                     }
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/18 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/30"
+                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-500/18 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/28"
                   >
                     {user?.plan_tier === 'lite' ? (
                       <Lock className="h-3.5 w-3.5" />
                     ) : (
                       <Sparkles className="h-3.5 w-3.5" />
                     )}
-                    {actionLoading === 'more_info' ? 'Opening Lensy...' : 'More Info with Lensy AI'}
+                    {actionLoading === 'more_info' ? 'Opening Lensy...' : 'More Info with Lensy'}
                   </button>
                 </div>
               ) : (
-                <div className="mt-2.5 space-y-2.5">
-                  <TextGenerateEffect
-                    words={tapResult.message || 'Could not identify this object clearly.'}
-                    dir={tapResult.direction}
-                    lang={user?.output_language}
-                    className="text-xs leading-relaxed text-zinc-200"
-                  />
-                  {tapResult.upgrade_required && (
+                /* Unrecognized Object -> Offer "Ask Lensy?" instant frame capture & auto-send */
+                <div className="mt-2 space-y-2.5">
+                  <p className="text-xs leading-relaxed text-zinc-300">
+                    Couldn&apos;t clearly identify this object. Would you like to ask{' '}
+                    <strong className="text-emerald-300">Lensy AI</strong>?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => openUpgradeModal(tapResult.message || '', false)}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 py-2 text-xs font-bold text-zinc-950"
+                      onClick={() => void handleAskLensyCapturedFrame()}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 px-3 py-2 text-xs font-bold text-zinc-950 shadow-[0_0_16px_rgba(16,185,129,0.35)] transition hover:brightness-110"
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Unlock Plus AI Identification
+                      {user?.plan_tier === 'lite' ? (
+                        <Lock className="h-3.5 w-3.5" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      Yes, Ask Lensy
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setTapResult(null)}
+                      className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/10"
+                    >
+                      No Thanks
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Hybrid Camera Overlay + Stack Pagination + Swipe-Up Tray */}
+        {/* Layered Stack Card Deck + Pagination */}
         <StackOverlay
           result={frameResult}
           planTier={user?.plan_tier || 'lite'}
@@ -689,40 +729,41 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
           onSpeak={(text) => user && void speakText(text, user.output_language, true)}
           onTextAction={(act) => void handleTextAction(act)}
           onMoreInfo={(src, trans, lang) => void handleMoreInfo('text', src, trans, lang)}
+          onDismiss={() => {
+            setFrameResult(null);
+            setActionOutput(null);
+          }}
         />
 
-        {/* Floating Camera Action Controls Dock (Right side on mobile for one-thumb reach) */}
+        {/* Compact Right-Edge Floating Camera Controls */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2.5"
+          className="absolute right-2.5 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2"
         >
-          {/* Primary Scan Shutter */}
           <button
             type="button"
             onClick={() => void handleManualScan()}
             disabled={scanning}
-            title="Scan Text Now"
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-500 text-zinc-950 shadow-[0_0_24px_rgba(16,185,129,0.65)] transition active:scale-95 disabled:opacity-60"
+            title="Scan Text"
+            className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-500 text-zinc-950 shadow-[0_0_20px_rgba(16,185,129,0.6)] transition active:scale-95 disabled:opacity-60"
           >
             <ScanText className="h-5 w-5" />
           </button>
 
-          {/* Auto-Scan Smart Gate Toggle */}
           <button
             type="button"
             onClick={() => setAutoScan((p) => !p)}
             disabled={cameraState !== 'streaming'}
-            title="Auto-Scan (Smart Blur & Scene Gate)"
-            className={`flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-md transition disabled:opacity-35 ${
+            title="Auto-Scan"
+            className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md transition disabled:opacity-35 ${
               autoScan
-                ? 'border-emerald-400 bg-emerald-500/25 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.5)]'
+                ? 'border-emerald-400 bg-emerald-500/25 text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.5)]'
                 : 'border-white/15 bg-zinc-950/75 text-zinc-300'
             }`}
           >
             <Radio className={`h-4 w-4 ${autoScan ? 'animate-pulse' : ''}`} />
           </button>
 
-          {/* Freeze / Resume Frame */}
           <button
             type="button"
             onClick={handleToggleFreeze}
@@ -730,40 +771,41 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
               Boolean(uploadedPreviewUrl) ||
               (cameraState !== 'streaming' && cameraState !== 'frozen')
             }
-            title={cameraState === 'frozen' ? 'Resume Live Camera' : 'Freeze Frame'}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-zinc-950/75 text-zinc-200 backdrop-blur-md transition hover:border-emerald-400/50 disabled:opacity-35"
+            title={cameraState === 'frozen' ? 'Resume Camera' : 'Freeze Frame'}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-zinc-950/75 text-zinc-200 backdrop-blur-md transition hover:border-emerald-400/50 disabled:opacity-35"
           >
-            {cameraState === 'frozen' ? <Play className="h-4 w-4 text-emerald-400" /> : <Pause className="h-4 w-4" />}
+            {cameraState === 'frozen' ? (
+              <Play className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <Pause className="h-4 w-4" />
+            )}
           </button>
 
-          {/* Capture / Upload Photo */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="Capture or Upload Photo"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-zinc-950/75 text-zinc-200 backdrop-blur-md transition hover:border-emerald-400/50"
+            title="Upload Photo"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-zinc-950/75 text-zinc-200 backdrop-blur-md transition hover:border-emerald-400/50"
           >
             <ImagePlus className="h-4 w-4" />
           </button>
 
-          {/* Back to Live Camera if viewing uploaded photo */}
           {uploadedPreviewUrl && (
             <button
               type="button"
               onClick={() => void startCamera()}
               title="Back to Live Camera"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-400/40 bg-emerald-500/20 text-emerald-300 backdrop-blur-md"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-400/40 bg-emerald-500/20 text-emerald-300 backdrop-blur-md"
             >
               <Camera className="h-4 w-4" />
             </button>
           )}
 
-          {/* Save Next Scan to History Toggle */}
           <button
             type="button"
             onClick={() => setSaveToHistory((p) => !p)}
             title="Save Scans to History"
-            className={`flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-md transition ${
+            className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md transition ${
               saveToHistory
                 ? 'border-emerald-400 bg-emerald-500/25 text-emerald-300'
                 : 'border-white/15 bg-zinc-950/75 text-zinc-400'
@@ -773,10 +815,10 @@ export const HomeCameraPage: React.FC<HomeCameraPageProps> = ({ onOpenLensySessi
           </button>
         </div>
 
-        {/* Helpful Tap Hint Pill when no results yet */}
+        {/* Clean Bottom Tap Hint Pill (Never Overlaps BottomNav) */}
         {!frameResult && !tapResult && (cameraState === 'streaming' || uploadedPreviewUrl) && (
-          <div className="pointer-events-none absolute bottom-28 z-20 rounded-full border border-white/10 bg-zinc-950/70 px-4 py-1.5 text-[11px] font-medium text-zinc-300 backdrop-blur-md">
-            Tap any object to identify • Press Scan to read & translate
+          <div className="pointer-events-none absolute bottom-3 z-20 rounded-full border border-white/10 bg-zinc-950/72 px-3.5 py-1 text-[11px] font-medium text-zinc-300 backdrop-blur-md">
+            Tap any object to identify • Tap Scan to translate
           </div>
         )}
       </div>

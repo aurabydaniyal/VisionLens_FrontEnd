@@ -181,14 +181,14 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#04070a] px-4 py-8">
+    <div className="relative flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-[#04070a] px-4 py-3">
       {/* Lightweight pure-CSS GPU neon backdrop (zero WebGL typing lag) */}
       <NeonAmbientCanvas />
 
-      <div className="glass-card relative z-10 w-full max-w-[410px] overflow-visible rounded-[32px] border border-emerald-500/30 px-6 pb-7 pt-16 shadow-[0_20px_60px_rgba(0,0,0,0.8),0_0_32px_rgba(16,185,129,0.14)]">
+      <div className="glass-card relative z-10 mt-6 w-full max-w-[390px] overflow-visible rounded-[28px] border border-emerald-500/30 px-5 pb-5 pt-12 shadow-[0_20px_60px_rgba(0,0,0,0.8),0_0_32px_rgba(16,185,129,0.14)] sm:px-6 sm:pb-6 sm:pt-14">
         {/* Top-Center Lensy Bot Logo with Pure-CSS GPU Signal Waves */}
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2">
-          <div className="relative flex h-24 w-24 items-center justify-center">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+          <div className="relative flex h-20 w-20 items-center justify-center">
             <span className="vl-signal-ring pointer-events-none absolute inset-0 rounded-full border border-emerald-400/70" />
             <span
               className="vl-signal-ring pointer-events-none absolute inset-0 rounded-full border border-emerald-400/55"
@@ -198,10 +198,10 @@ export const AuthPage: React.FC = () => {
               className="vl-signal-ring pointer-events-none absolute inset-0 rounded-full border border-emerald-400/40"
               style={{ animationDelay: '1.7s' }}
             />
-            <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border-2 border-emerald-400/75 bg-zinc-950 p-1 shadow-[0_0_26px_rgba(16,185,129,0.55)]">
+            <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full border-2 border-emerald-400/75 bg-zinc-950 p-1 shadow-[0_0_24px_rgba(16,185,129,0.55)]">
               <img
                 src="/lensy-logo.png"
-                alt="Vision Lens Lensy Bot"
+                alt="Vision Lens"
                 className="h-full w-full rounded-full object-cover"
               />
             </div>
@@ -210,21 +210,16 @@ export const AuthPage: React.FC = () => {
 
         {/* Brand Headline */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-2">
-            <h1 className="bg-gradient-to-r from-white via-emerald-200 to-emerald-400 bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
-              Vision Lens
-            </h1>
-            <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-              V1
-            </span>
-          </div>
-          <p className="mt-1 text-xs font-medium text-zinc-400">
+          <h1 className="bg-gradient-to-r from-white via-emerald-200 to-emerald-400 bg-clip-text text-xl font-extrabold tracking-tight text-transparent sm:text-2xl">
+            Vision Lens
+          </h1>
+          <p className="mt-0.5 text-[11px] font-medium text-zinc-400">
             See the World. Understand Everything.
           </p>
         </div>
 
         {/* Snappy Glassy Mode Switcher Tabs */}
-        <div className="mt-6 grid grid-cols-2 rounded-2xl border border-white/10 bg-zinc-950/80 p-1">
+        <div className="mt-4 grid grid-cols-2 rounded-2xl border border-white/10 bg-zinc-950/80 p-1">
           {(['login', 'register'] as const).map((tab) => {
             const active = mode === tab;
             return (
@@ -451,8 +446,8 @@ export const AuthPage: React.FC = () => {
           </form>
         )}
 
-        <p className="mt-5 text-center text-[11px] text-zinc-500">
-          Zero static camera storage • Passwordless 5-day encrypted session
+        <p className="mt-3.5 text-center text-[10px] text-zinc-500">
+          Private • Passwordless sign-in
         </p>
       </div>
     </div>
